@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>올팍 주차예보 — 올림픽공원 주차 혼잡 예보·방문 안내</title>
+<meta name="description" content="한국체육산업개발 공공데이터로 만든 올림픽공원 시간대별 주차 혼잡 예보와 방문 안내">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <h1>올팍 주차예보</h1>
+    <p class="sub">올림픽공원, 언제 가면 덜 붐빌까? 공연·요일·계절로 시간대별 주차 혼잡을 미리 알려드려요.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="card" id="forecast">
+    <h2>날짜별 주차 혼잡 예보</h2>
+    <div class="controls">
+      <label>방문 날짜 <input type="date" id="date"></label>
+      <label class="chk"><input type="checkbox" id="event"> 공연·행사 있음</label>
+      <label class="chk"><input type="checkbox" id="rain"> 비 예보</label>
+    </div>
+    <div id="eventList" class="events"></div>
+    <div id="summary" class="summary"></div>
+    <div id="chart" class="chart" role="img" aria-label="시간대별 예상 혼잡도"></div>
+    <div class="legend">
+      <span><i class="lv0"></i>원활</span><span><i class="lv1"></i>보통</span><span><i class="lv2"></i>혼잡</span>
+    </div>
+    <p class="note" id="modelNote"></p>
+  </section>
+
+  <section class="card" id="ask">
+    <h2>무엇이든 물어보세요</h2>
+    <form id="askForm" class="ask">
+      <input id="q" type="search" placeholder="예: 주차 요금은 얼마예요? / 반려견 데리고 가도 되나요?" autocomplete="off">
+      <button type="submit">찾기</button>
+    </form>
+    <div class="chips" id="chips"></div>
+    <div id="answers"></div>
+  </section>
+
+  <section class="card small">
+    <h2>사용한 공공데이터</h2>
+    <ul class="src" id="sources"></ul>
+  </section>
+</main>
+
+<footer class="wrap foot">
+  2026년도 한국체육산업개발 공공데이터 활용 경진대회 출품작 · 팀 AnIma<br>
+  예보는 과거 데이터로 계산한 참고값이며 실제 상황과 다를 수 있습니다. 공식 안내는 <a href="https://www.ksponco.or.kr/olympicpark/" target="_blank" rel="noopener">올림픽공원 홈페이지</a>를 확인하세요.
+</footer>
+<script src="app.js"></script>
+</body>
+</html>
