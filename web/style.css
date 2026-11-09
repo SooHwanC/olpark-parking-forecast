@@ -1,0 +1,40 @@
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1d2433;--mute:#667085;--line:#e4e7ec;--brand:#1f5fbf;
+  --lv0:#3aa76d;--lv1:#f2b233;--lv2:#e5484d}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 "Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
+.wrap{max-width:860px;margin:0 auto;padding:0 16px}
+.top{background:var(--brand);color:#fff;padding:28px 0 22px}
+.top h1{margin:0;font-size:26px}
+.sub{margin:6px 0 0;opacity:.9}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin:18px 0}
+.card h2{margin:0 0 12px;font-size:18px}
+.controls{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center}
+.controls input[type=date]{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;margin-left:6px}
+.chk{display:flex;gap:6px;align-items:center;cursor:pointer}
+.events{margin:12px 0 0;font-size:14px;color:var(--mute)}
+.events a{color:var(--brand)}
+.summary{margin:14px 0 6px;padding:12px 14px;border-radius:10px;background:#f0f5ff;font-size:15px}
+.summary b{color:var(--brand)}
+.chart{display:grid;grid-template-columns:repeat(15,1fr);gap:4px;align-items:end;height:180px;margin-top:10px}
+.bar{position:relative;border-radius:5px 5px 0 0;min-height:3px}
+.bar span{position:absolute;bottom:-20px;left:0;right:0;text-align:center;font-size:11px;color:var(--mute)}
+.bar.lv0{background:var(--lv0)}.bar.lv1{background:var(--lv1)}.bar.lv2{background:var(--lv2)}
+.legend{display:flex;gap:14px;margin-top:28px;font-size:13px;color:var(--mute)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px}
+i.lv0{background:var(--lv0)}i.lv1{background:var(--lv1)}i.lv2{background:var(--lv2)}
+.note{font-size:12px;color:var(--mute);margin:10px 0 0}
+.ask{display:flex;gap:8px}
+.ask input{flex:1;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px}
+.ask button{font:inherit;padding:0 18px;border:0;border-radius:10px;background:var(--brand);color:#fff;cursor:pointer}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.chips button{font:inherit;font-size:13px;padding:4px 10px;border:1px solid var(--line);border-radius:99px;background:#fff;cursor:pointer}
+.ans{border-top:1px solid var(--line);padding:12px 0}
+.ans h3{margin:0 0 4px;font-size:15px}
+.ans p{margin:0 0 6px}
+.ans .meta{font-size:12px;color:var(--mute)}
+.ans .meta a{color:var(--brand)}
+.tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:4px;background:#eef2f7;margin-right:6px}
+.src{margin:0;padding-left:18px;font-size:13px;color:var(--mute)}
+.small h2{font-size:15px}
+.foot{font-size:12px;color:var(--mute);padding:10px 16px 40px}
+.foot a{color:var(--brand)}

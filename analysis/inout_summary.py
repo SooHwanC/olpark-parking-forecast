@@ -1,0 +1,30 @@
+import sys, pandas as pd, numpy as np
+sys.stdout.reconfigure(encoding='utf-8')
+df=pd.read_csv(sys.argv[1], encoding='cp949')
+df.columns=['day','tin','tout']
+df['tin']=pd.to_datetime(df.tin,errors='coerce'); df['tout']=pd.to_datetime(df.tout,errors='coerce')
+print('rows',len(df),'bad_in',df.tin.isna().sum(),'no_out',df.tout.isna().sum())
+print('in range',df.tin.min(),df.tin.max())
+d=(df.tout-df.tin).dt.total_seconds()/60
+print('dur min quantiles',d.quantile([.1,.25,.5,.75,.9,.99]).round(0).to_dict(),'neg',(d<0).sum(),'>24h',(d>1440).sum())
+daily=df.groupby(df.tin.dt.date).size()
+dow=pd.Series(pd.to_datetime(daily.index).dayofweek,index=daily.index)
+print('daily entries mean/min/max',round(daily.mean()),daily.min(),daily.max())
+print('by dow mean', daily.groupby(dow.values).mean().round(0).to_dict())
+print('top10 days'); print(daily.sort_values(ascending=False).head(10).to_string())
+print('bottom5'); print(daily.sort_values().head(5).to_string())
+# hourly occupancy (cars present), exclude >24h stays and missing exits
+v=df[(d>=0)&(d<=1440)].copy()
+idx=pd.date_range('2024-07-01','2024-08-01',freq='h',inclusive='left')
+ins=v.tin.dt.floor('h').value_counts().reindex(idx,fill_value=0)
+outs=v.tout.dt.floor('h').value_counts().reindex(idx,fill_value=0)
+occ=(ins-outs).cumsum()
+pk=occ.groupby(occ.index.date).max()
+print('daily peak occupancy mean/min/max',round(pk.mean()),pk.min(),pk.max())
+print('peak top8'); print(pk.sort_values(ascending=False).head(8).to_string())
+h=ins.groupby(ins.index.hour).mean().round(0)
+print('mean entries by hour',h.to_dict())
+wk=occ[occ.index.dayofweek<5]; we=occ[occ.index.dayofweek>=5]
+print('occ by hour weekday',wk.groupby(wk.index.hour).mean().round(0).to_dict())
+print('occ by hour weekend',we.groupby(we.index.hour).mean().round(0).to_dict())
+cv=daily.std()/daily.mean(); print('daily entries CV',round(cv,2))

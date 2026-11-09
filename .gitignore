@@ -1,0 +1,13 @@
+.env
+data/raw/
+check/
+__pycache__/
+# 제출 서류 작업물은 저장소에 넣지 않음
+기획서_초안.md
+fill_forms.py
+build_plan_docx.py
+hwp2pdf.py
+docx2pdf.py
+데이터점검.md
+아이디어_후보.md
+데이터목록.md
