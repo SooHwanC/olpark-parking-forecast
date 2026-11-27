@@ -33,7 +33,16 @@ def build_docs():
 
 def build_events():
     ev = []
+    linked = W / 'data/events2025_hourly.csv'  # parse_2025.py: 2025 연계 데이터 공연명·관람객
+    if linked.exists():
+        e = pd.read_csv(linked, dtype={'event_name': str}).fillna('')
+        e = e[e.audience.astype(int) > 0]
+        for day, g in e.groupby(e.ts.str[:10]):
+            names = max((clean(n) for n in g.event_name), key=len)  # 같은 날 여러 시간 행 중 가장 완전한 이름
+            ev.append({'date': day, 'title': names, 'audience': int(g.audience.max()), 'url': '',
+                       'src': '한국체육산업개발_2025 차량입출차·공연·날씨정보 등 연계 데이터'})
     for r in read('perf_en').itertuples():
+        if linked.exists() and r.공연일자.startswith('2025'): continue  # 2025는 연계 데이터 일정이 정확
         ev.append({'date': r.공연일자, 'title': clean(r.공연제목), 'url': r.상세주소, 'src': '한국체육산업개발_영문 공연정보'})
     extra = W / 'data/events_extra.json'  # 공연정보 API 수집분(있으면)
     if extra.exists():

@@ -1,7 +1,12 @@
 """시간대별 주차 수요 예보 모델 → web/data/model.json.
 
-입력이 있으면 2025 연계 데이터(data/linked_hourly.csv), 없으면 2024-07 입출차로 만든다.
-모델 = (요일유형 × 공연 여부)별 시간대 평균 곡선 × 월 계수. 등급은 관측 최대 수준(99.5% 분위) 대비 비율.
+입력: data/occ2025.csv (parse_2025.py: 2025 입출차 재차 대수 + 연계 데이터 관람객 수)
+쓰는 날: 기록이 온전한 1~7·10월, 11·12월 1~6일(8·9월은 65,534건 표본, 11·12월은 7일 이후 없음).
+        명절 연휴 등 기록이 그달 중앙값의 60% 미만인 날은 뺀다.
+모델 = (요일유형 × 대형 공연[관람객 1만 명 이상]) 시간대 평균 곡선.
+  월별주차현황 계수를 곱하면 검증 오차가 커져(2025 재차 대수는 월별 변동이 작다) 쓰지 않는다.
+등급 = 학습 기간 8~21시 관측값 분위: 상위 20% 이상 혼잡, 상위 50% 이상 보통.
+검증 = 1~7월로 만들고 처음 보는 10~12월을 예측(시간순 분할).
 """
 import json, sys
 from pathlib import Path
@@ -11,85 +16,64 @@ import pandas as pd
 sys.stdout.reconfigure(encoding='utf-8')
 W = Path(__file__).resolve().parents[1]
 OUT = W / 'web/data'
-EVENT_DAYS_2024_07 = {'2024-07-20', '2024-07-21'}  # 백현 KSPO DOME 공연 주말(영문 공연정보 7/20 등록)로 가정
+BIG = 10000
+SRC = '2025 올림픽공원 입출차정보(전체구역) 재차 대수 + 2025 연계 데이터 공연관람객수'
 
 
-def daytype(ts):
-    return 'weekend' if ts.day_of_week >= 5 else 'weekday'
-
-
-def hourly_from_inout():
-    df = pd.read_csv(W / 'data/raw/입출차_202407.csv', encoding='cp949')
-    df.columns = ['day', 'tin', 'tout']
-    df['tin'], df['tout'] = pd.to_datetime(df.tin), pd.to_datetime(df.tout)
-    d = (df.tout - df.tin).dt.total_seconds() / 60
-    v = df[(d > 10) & (d <= 1440)]  # 10분 이하는 승하차·통과로 보고 제외
-    idx = pd.date_range('2024-07-01', '2024-08-01', freq='h', inclusive='left')
-    occ = (v.tin.dt.floor('h').value_counts().reindex(idx, fill_value=0)
-           - v.tout.dt.floor('h').value_counts().reindex(idx, fill_value=0)).cumsum()
-    h = pd.DataFrame({'ts': idx, 'value': occ.values})
-    h['event'] = h.ts.dt.strftime('%Y-%m-%d').isin(EVENT_DAYS_2024_07).astype(int)
-    h['rain'] = 0
-    return h, '2024-07 입출차(동2·남2·북2문) 재차 대수', 'cars'
-
-
-def hourly_from_linked():
-    h = pd.read_csv(W / 'data/linked_hourly.csv', parse_dates=['ts'])
-    return h, '2025 차량입출차·공연·날씨 연계 데이터 주차대수', 'cars'
-
-
-def fit(h):
-    h = h.copy()
+def load():
+    h = pd.read_csv(W / 'data/occ2025.csv', parse_dates=['ts'])
+    h['day'] = h.ts.dt.day
+    last = h[h.n_day > 0].groupby('month').day.max()
+    cut = h.month.isin([11, 12]) & (h.day >= h.month.map(last))  # 건수 상한에서 잘린 마지막 날
+    h = h[(h.ok == 1) & ~h.month.isin([8, 9]) & ~cut].copy()
     h['hour'] = h.ts.dt.hour
-    h['dt'] = h.ts.map(daytype)
-    month_f = json.loads((OUT / 'month_factor.json').read_text())
-    h['mf'] = h.ts.dt.month.map(lambda m: month_f[str(m)])
-    h['base'] = h.value / h.mf  # 월 효과 제거한 값으로 곡선 학습
-    curves = {}
-    for (dt, ev), g in h.groupby(['dt', 'event']):
-        c = g.groupby('hour').base.mean().reindex(range(24))
-        curves[f'{dt}_{ev}'] = [None if np.isnan(x) else round(float(x), 1) for x in c]
-    # 공연 곡선이 없는 요일유형은 다른 요일유형의 시간대별 공연 배율을 빌려 채운다
-    hr_ratio = [1.0] * 24
-    for dt in ['weekend', 'weekday']:
-        a, b = curves.get(f'{dt}_1'), curves.get(f'{dt}_0')
-        if a and b:
-            hr_ratio = [max(1.0, x / y) if x and y else 1.0 for x, y in zip(a, b)]
-            break
-    ev_ratio = float(np.median(hr_ratio[14:21]))
+    h['dt'] = np.where(h.weekend == 1, 'weekend', 'weekday')
+    h['big'] = (h.audience >= BIG).astype(int)
+    return h
+
+
+def fit(h, use_event=True):
+    key = h.dt + '_' + (h.big if use_event else h.big * 0).astype(str)
+    curves = {k: [round(float(x), 1) for x in g.groupby('hour').occ.mean().reindex(range(24)).fillna(0)]
+              for k, g in h.groupby(key)}
     for dt in ['weekday', 'weekend']:
-        if f'{dt}_1' not in curves:
-            curves[f'{dt}_1'] = [None if x is None else round(x * r, 1) for x, r in zip(curves[f'{dt}_0'], hr_ratio)]
-    rain_f = 1.0
-    if h.rain.sum() > 0:
-        day = h[(h.hour >= 10) & (h.hour <= 20)]
-        rain_f = round(float(day[day.rain == 1].base.mean() / day[day.rain == 0].base.mean()), 3)
-    day = h[(h.hour >= 8) & (h.hour <= 21)].value
-    ref = float(day.quantile(0.995))  # 관측 최대 수준; 혼잡=70%, 보통=45% 이상
-    thr = {'busy': round(0.7 * ref, 1), 'normal': round(0.45 * ref, 1), 'ref': round(ref, 1)}
-    return curves, ev_ratio, rain_f, thr
+        curves.setdefault(f'{dt}_1', curves[f'{dt}_0'])
+    day = h[(h.hour >= 8) & (h.hour <= 21)].occ
+    thr = {'busy': round(float(day.quantile(0.8)), 1), 'normal': round(float(day.quantile(0.5)), 1)}
+    return curves, thr
 
 
-def backtest(h, curves, thr):
-    """학습 곡선으로 각 시간을 다시 예측해 등급 일치율·오차를 본다(같은 데이터, 참고용)."""
-    month_f = json.loads((OUT / 'month_factor.json').read_text())
-    pred = [curves[f'{daytype(t)}_{e}'][t.hour] * month_f[str(t.month)] for t, e in zip(h.ts, h.event)]
-    h = h.assign(pred=pred)
-    d = h[(h.ts.dt.hour >= 8) & (h.ts.dt.hour <= 21)]
-    lv = lambda x: 2 if x >= thr['busy'] else 1 if x >= thr['normal'] else 0
-    acc = float((d.value.map(lv) == d.pred.map(lv)).mean())
-    mape = float((abs(d.pred - d.value) / d.value.clip(lower=1)).median())
-    return round(acc, 3), round(mape, 3)
+def score(h, curves, thr):
+    d = h[(h.hour >= 8) & (h.hour <= 21)]
+    act = d.occ.values
+    pred = np.array([curves[f'{a}_{b}'][t] for a, b, t in zip(d.dt, d.big, d.hour)])
+    lv = lambda x: np.where(x >= thr['busy'], 2, np.where(x >= thr['normal'], 1, 0))
+    ape = np.abs(pred - act) / np.clip(act, 1, None)
+    big, busy, eve = d.big.values == 1, lv(act) == 2, d.hour.between(17, 21).values
+    return {'days': int(d.ts.dt.date.nunique()), 'big_days': int(d[big].ts.dt.date.nunique()), 'hours': int(len(d)),
+            'level_acc': round(float((lv(act) == lv(pred)).mean()), 3),
+            'level_within1': round(float((np.abs(lv(act) - lv(pred)) <= 1).mean()), 3),
+            'median_ape': round(float(np.median(ape)), 3),
+            'evening_median_ape': round(float(np.median(ape[eve])), 3),
+            'big_evening_median_ape': round(float(np.median(ape[big & eve])), 3) if big.any() else None,
+            'busy_hours': int(busy.sum()), 'busy_recall': round(float((lv(pred)[busy] == 2).mean()), 3) if busy.any() else None,
+            'busy_precision': round(float((lv(act)[lv(pred) == 2] == 2).mean()), 3) if (lv(pred) == 2).any() else None}
 
 
 if __name__ == '__main__':
-    src = hourly_from_linked if (W / 'data/linked_hourly.csv').exists() else hourly_from_inout
-    h, name, unit = src()
-    curves, ev_ratio, rain_f, thr = fit(h)
-    acc, mape = backtest(h, curves, thr)
-    model = {'source': name, 'rows': len(h), 'unit': unit, 'curves': curves, 'event_ratio': round(ev_ratio, 3),
-             'rain_factor': rain_f, 'thresholds': thr, 'backtest': {'level_acc': acc, 'median_ape': mape}}
+    h = load()
+    tr, te = h[h.month <= 7], h[h.month >= 10]
+    val = {}
+    for name, ue in [('model', True), ('no_event', False)]:
+        c, t = fit(tr, ue)
+        val[name] = score(te, c, t)
+    curves, thr = fit(h)
+    n = h[h.hour == 0].groupby(['dt', 'big']).size()
+    model = {'source': SRC, 'days': int(h.ts.dt.date.nunique()), 'months': sorted(int(m) for m in h.month.unique()),
+             'big_audience': BIG, 'curve_days': {f'{a}_{b}': int(v) for (a, b), v in n.items()},
+             'unit': 'cars', 'curves': curves, 'thresholds': thr,
+             'validation': {'train': '2025-01~07', 'test': '2025-10~12', **val}}
     (OUT / 'model.json').write_text(json.dumps(model, ensure_ascii=False), encoding='utf-8')
-    print(json.dumps({k: v for k, v in model.items() if k != 'curves'}, ensure_ascii=False))
-    for k, c in curves.items():
-        print(k, [None if x is None else int(x) for x in c[8:22]])
+    print(json.dumps({k: v for k, v in model.items() if k != 'curves'}, ensure_ascii=False, indent=1))
+    for k, c in sorted(curves.items()):
+        print(k, [int(x) for x in c[8:23]])
