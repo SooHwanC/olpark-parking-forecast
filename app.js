@@ -7,7 +7,7 @@ const ymd = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOStri
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 async function load() {
-  const get = (f) => fetch('data/' + f).then((r) => r.json());
+  const get = (f) => fetch('data/' + f, { cache: 'no-cache' }).then((r) => r.json());
   [M, EVENTS, DOCS] = await Promise.all([get('model.json'), get('events.json'), get('docs.json')]);
   IDX = buildIndex(DOCS);
   const hp = new URLSearchParams(location.hash.slice(1)); // #date=YYYY-MM-DD&q=질문 으로 바로 열기
@@ -24,7 +24,7 @@ async function load() {
     '한국체육산업개발 자주 묻는 질문정보 · 올림픽공원 핫뉴스 정보',
   ].map((s) => `<li>${esc(s)}</li>`).join('');
   const v = M.validation.model;
-  $('modelNote').textContent = `예보 근거: ${M.source} (${M.days}일). 1~7월로 만든 예보를 처음 보는 10~12월 ${v.days}일에 맞춰 본 주차 중 차량 오차 중앙값 ${(v.median_ape * 100).toFixed(1)}%, 혼잡 등급 일치율 ${(v.level_acc * 100).toFixed(0)}%(한 단계 이내 ${(v.level_within1 * 100).toFixed(0)}%). 혼잡은 2025 관측값(8~21시) 상위 20%, 보통은 상위 50%.`;
+  $('modelNote').textContent = `예보 근거: ${M.source} (${M.days}일). 1~7월로 만든 예보를 처음 보는 10~12월 ${v.days}일에 맞춰 본 주차 중 차량 오차 중앙값 ${(v.median_ape * 100).toFixed(1)}%(저녁 ${(v.evening_median_ape * 100).toFixed(1)}%, 요일만 쓰면 ${(M.validation.no_event.evening_median_ape * 100).toFixed(1)}%), 혼잡 등급 일치율 ${(v.level_acc * 100).toFixed(0)}%(한 단계 이내 ${(v.level_within1 * 100).toFixed(0)}%). 혼잡은 2025 관측값(8~21시) 상위 20%, 보통은 상위 50%.`;
   autoEvent();
   render();
   if (hp.get('q')) { $('q').value = hp.get('q'); ask(hp.get('q')); }
@@ -34,13 +34,17 @@ function eventsOn(date) { return EVENTS.filter((e) => e.date === date); }
 
 function autoEvent() {
   const ev = eventsOn($('date').value);
-  // 관람객 수가 있으면(2025 연계 데이터) 1만 명 이상일 때만, 없으면(공연정보) 등록된 공연을 대형으로 본다
-  $('event').checked = ev.some((e) => (e.audience == null ? true : e.audience >= M.big_audience));
-  const aud = ev.find((e) => e.audience != null);
-  $('eventList').innerHTML = ev.length
-    ? '이날 공연·행사: ' + ev.slice(0, 4).map((e) => (e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>` : esc(e.title))).join(', ')
-      + (aud ? ` (관람객 ${aud.audience.toLocaleString()}명, 연계 데이터)` : '')
-    : '공개 데이터에 등록된 이날 공연·행사가 없어요. 알고 있는 대형 공연이 있으면 위에서 체크하세요.';
+  const aud = ev.find((e) => e.audience != null); // 2025 연계 데이터(관람객 수)만 공연일로 믿는다
+  const d = new Date($('date').value + 'T00:00:00'), we = d.getDay() === 0 || d.getDay() === 6;
+  const known = $('date').value.startsWith('2025'); // 2025는 연계 데이터에 없으면 공연 없는 날
+  $('event').checked = aud ? aud.audience >= M.big_audience : !known && we; // 영문 공연정보 날짜는 등록일이 섞여 쓰지 않음
+  const reg = ev.filter((e) => e.audience == null);
+  $('eventList').innerHTML = aud
+    ? `이날 공연: ${esc(aud.title)} (관람객 ${aud.audience.toLocaleString()}명, 2025 연계 데이터)`
+    : known ? '2025 연계 데이터에 이날 공연이 없어요.'
+    : (we ? `관람객 정보가 없는 날이에요. 2025년 기록이 온전한 주말 ${M.weekend_days}일 중 ${M.weekend_big_days}일이 대형 공연일이라 기본으로 체크했어요. 대형 공연이 없으면 체크를 해제하세요.`
+          : '관람객 정보가 없는 날이에요. 대형 공연이 있으면 위에서 체크하세요.')
+      + (reg.length ? ' 참고(영문 공연정보, 공연 날짜가 아닐 수 있음): ' + reg.slice(0, 3).map((e) => (e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>` : esc(e.title))).join(', ') : '');
 }
 
 function predict(date, event) {
@@ -70,7 +74,7 @@ function summarize(vals) {
   const dt = d.getDay() === 0 || d.getDay() === 6 ? 'weekend' : 'weekday';
   const eve = (k) => [18, 19, 20].reduce((s, h) => s + M.curves[`${dt}_${k}`][h], 0);
   const big = $('event').checked
-    ? ` 대형 공연일 18~20시 주차 차량은 대형 공연이 없는 ${dt === 'weekend' ? '주말' : '평일'}의 약 ${(eve(1) / eve(0)).toFixed(1)}배예요(2025 평균). 저녁 공연이라면 일찍 도착하거나 지하철을 이용하세요.` : '';
+    ? ` 대형 공연일 18~20시 주차 차량은 대형 공연이 없는 ${dt === 'weekend' ? '주말' : '평일'}의 약 ${(eve(1) / eve(0)).toFixed(1)}배예요(2025 평균). 2025년 기록이 온전한 날 중 관람객 2만 명 넘는 공연일 ${M.huge_days}일 가운데 ${M.huge_busy_days}일이 17~20시에도 혼잡 기준을 넘었어요. 저녁 공연이라면 일찍 도착하거나 지하철을 이용하세요.` : '';
   if (!busy.length) {
     const q = calm.length ? `${fmt(calm)}는 대체로 원활해요.` : '';
     return `이날은 크게 붐비지 않을 것으로 보여요. 가장 차가 많은 시간은 <b>${HOURS[peak]}시</b> 무렵이에요. ${q}${big}`;
@@ -102,6 +106,7 @@ function search(q, k = 3) {
     const len = [...tf.values()].reduce((a, b) => a + b, 0);
     let s = 0;
     qs.forEach((g) => { const f = tf.get(g); if (!f) return; const idf = Math.log(1 + (n - df.get(g) + 0.5) / (df.get(g) + 0.5)); s += idf * (f * 2.2) / (f + 1.2 * (0.25 + 0.75 * len / avg)); });
+    if (/미사|경정/.test(DOCS[i].title + DOCS[i].body) && !/미사|경정/.test(q)) s *= 0.3; // 올림픽공원 외 시설 안내
     return [s, i];
   }).filter(([s]) => s > 0).sort((a, b) => b[0] - a[0]);
   if (!scores.length) return [];
