@@ -74,7 +74,7 @@ function summarize(vals) {
   const dt = d.getDay() === 0 || d.getDay() === 6 ? 'weekend' : 'weekday';
   const eve = (k) => [18, 19, 20, 21].reduce((s, h) => s + M.curves[`${dt}_${k}`][h], 0);
   const big = $('event').checked
-    ? ` 대형 공연일 18~21시 주차 차량은 대형 공연이 없는 ${dt === 'weekend' ? '주말' : '평일'}의 약 ${(eve(1) / eve(0)).toFixed(1)}배예요(2025 평균). 관람객이 2만 명을 넘는 공연이면 그래프와 달리 17~20시도 혼잡할 수 있어요(2025년 ${M.huge_days}일 중 ${M.huge_busy_days}일). 저녁 공연이라면 일찍 도착하거나 지하철을 이용하세요.` : '';
+    ? ` 대형 공연일 18~21시 주차 차량은 대형 공연이 없는 ${dt === 'weekend' ? '주말' : '평일'}의 약 ${(eve(1) / eve(0)).toFixed(1)}배예요(2025 평균). 관람객이 2만 명을 넘는 공연이면 그래프보다 늦은 시간(17~20시)까지 혼잡할 수 있어요(2025년 기록이 온전한 날 중 ${M.huge_days}일 가운데 ${M.huge_busy_days}일). 저녁 공연이라면 일찍 도착하거나 지하철을 이용하세요.` : '';
   if (!busy.length) {
     const q = calm.length ? `${fmt(calm)}는 대체로 원활해요.` : '';
     return `이날은 크게 붐비지 않을 것으로 보여요. 가장 차가 많은 시간은 <b>${HOURS[peak]}시</b> 무렵이에요. ${q}${big}`;
