@@ -9,13 +9,16 @@
 
 ## 데이터 갱신
 
-원자료(`data/raw/`)는 공공데이터포털에서 내려받는다. 연계 API는 `.env`에 `KCISA_KEY`가 필요하다.
+원자료(`data/raw/`)는 공공데이터포털에서 내려받는다. 2025 API는 `.env`에 `KCISA_KEY`(연계), `KCISA_KEY_INOUT`(입출차)이 필요하다.
 
 ```
+python analysis/fetch_linked.py 1000 API_CPM_009     # 2025 연계 데이터
+python analysis/fetch_linked.py 10000 API_CPM_008    # 2025 입출차정보(전체구역)
+uv run --no-project --with pandas python analysis/parse_2025.py
 uv run --no-project --with pandas python analysis/build_site_data.py
 uv run --no-project --with pandas python analysis/build_model.py
 ```
 
 ## 사용 데이터
 
-한국체육산업개발주식회사 올림픽공원 입출차 정보, 올림픽공원 2025 차량입출차·공연·날씨정보 등 연계 데이터, 월별주차현황, 영문 공연정보, 자주 묻는 질문정보, 올림픽공원 핫뉴스 정보 (공공데이터포털, 이용허락범위 제한 없음)
+한국체육산업개발주식회사 올림픽공원 입출차정보(전체구역, 2025 API), 올림픽공원 2025 차량입출차·공연·날씨정보 등 연계 데이터, 올림픽공원 입출차 정보(2024-07), 영문 공연정보, 자주 묻는 질문정보, 올림픽공원 핫뉴스 정보 (공공데이터포털, 이용허락범위 제한 없음)

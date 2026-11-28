@@ -52,18 +52,6 @@ def build_events():
     return len(ev)
 
 
-def build_month_factor():
-    m = read('monthly_parking')
-    m = m[m.주차장소 == '올림픽공원'].copy()
-    m['월'] = m.월.str.replace('월', '').astype(int)
-    m['주차대수'] = m.주차대수.astype(int)
-    by = m.groupby('월').주차대수.mean()
-    return {int(k): round(float(v / by.mean()), 3) for k, v in by.items()}
-
-
 if __name__ == '__main__':
     print('docs', build_docs())
     print('events', build_events())
-    mf = build_month_factor()
-    (OUT / 'month_factor.json').write_text(json.dumps(mf), encoding='utf-8')
-    print('month_factor', mf)
