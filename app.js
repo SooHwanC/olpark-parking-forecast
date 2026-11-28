@@ -36,7 +36,7 @@ function autoEvent() {
   const ev = eventsOn($('date').value);
   const aud = ev.find((e) => e.audience != null); // 2025 연계 데이터(관람객 수)만 공연일로 믿는다
   const d = new Date($('date').value + 'T00:00:00'), we = d.getDay() === 0 || d.getDay() === 6;
-  const known = $('date').value.startsWith('2025'); // 2025는 연계 데이터에 없으면 공연 없는 날
+  const known = $('date').value.startsWith('2025') && !M.linked_missing.includes($('date').value); // 연계 데이터가 있는 2025 날짜는 공연 없는 날
   $('event').checked = aud ? aud.audience >= M.big_audience : !known && we; // 영문 공연정보 날짜는 등록일이 섞여 쓰지 않음
   const reg = ev.filter((e) => e.audience == null);
   $('eventList').innerHTML = aud
@@ -72,14 +72,15 @@ function summarize(vals) {
   const busy = runsOf(2), calm = runsOf(0);
   const d = new Date($('date').value + 'T00:00:00');
   const dt = d.getDay() === 0 || d.getDay() === 6 ? 'weekend' : 'weekday';
-  const eve = (k) => [18, 19, 20].reduce((s, h) => s + M.curves[`${dt}_${k}`][h], 0);
+  const eve = (k) => [18, 19, 20, 21].reduce((s, h) => s + M.curves[`${dt}_${k}`][h], 0);
   const big = $('event').checked
-    ? ` 대형 공연일 18~20시 주차 차량은 대형 공연이 없는 ${dt === 'weekend' ? '주말' : '평일'}의 약 ${(eve(1) / eve(0)).toFixed(1)}배예요(2025 평균). 2025년 기록이 온전한 날 중 관람객 2만 명 넘는 공연일 ${M.huge_days}일 가운데 ${M.huge_busy_days}일이 17~20시에도 혼잡 기준을 넘었어요. 저녁 공연이라면 일찍 도착하거나 지하철을 이용하세요.` : '';
+    ? ` 대형 공연일 18~21시 주차 차량은 대형 공연이 없는 ${dt === 'weekend' ? '주말' : '평일'}의 약 ${(eve(1) / eve(0)).toFixed(1)}배예요(2025 평균). 관람객이 2만 명을 넘는 공연이면 그래프와 달리 17~20시도 혼잡할 수 있어요(2025년 ${M.huge_days}일 중 ${M.huge_busy_days}일). 저녁 공연이라면 일찍 도착하거나 지하철을 이용하세요.` : '';
   if (!busy.length) {
     const q = calm.length ? `${fmt(calm)}는 대체로 원활해요.` : '';
     return `이날은 크게 붐비지 않을 것으로 보여요. 가장 차가 많은 시간은 <b>${HOURS[peak]}시</b> 무렵이에요. ${q}${big}`;
   }
-  const arrive = busy[0][0] - 1; // FAQ: 공연 임박 시 1시간 여유 권장
+  const main = $('event').checked ? busy.find(([a]) => a >= 12) || busy[0] : busy[0]; // 공연일은 오후 혼잡 기준
+  const arrive = main[0] - 1; // FAQ: 공연 임박 시 1시간 여유 권장
   const morning = dt === 'weekday' && !$('event').checked && busy[0][0] <= 11
     ? ` 평일 오전 붐빔은 대형 공연이 없는 날에도 나타나요(2025년 대형 공연 없는 평일 10시 평균 ${Math.round(M.curves.weekday_0[10]).toLocaleString()}대).` : '';
   return `<b>${fmt(busy)} 혼잡</b>, 가장 붐비는 때는 <b>${HOURS[peak]}시</b>예요. 차를 가져오신다면 <b>${arrive}시 이전 도착</b>을 권해요. 가능하면 지하철(5·9호선 올림픽공원역, 8호선 몽촌토성역)을 이용하세요.${morning}${big}`;
