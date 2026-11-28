@@ -63,19 +63,22 @@ function render() {
 function summarize(vals) {
   const lv = vals.map(level);
   const peak = vals.indexOf(Math.max(...vals));
-  let firstBusy = lv[peak] === 2 ? peak : -1;
-  while (firstBusy > 0 && lv[firstBusy - 1] === 2) firstBusy--; // 정점이 속한 혼잡 구간의 시작
-  const runs = []; // 원활한 시간대를 이어진 구간으로
-  HOURS.forEach((h, i) => { if (lv[i] !== 0) return; const r = runs[runs.length - 1]; if (r && r[1] === h - 1) r[1] = h; else runs.push([h, h]); });
-  if (firstBusy < 0) {
-    const q = runs.length ? `${runs.map(([a, b]) => (a === b ? `${a}시` : `${a}~${b}시`)).join(', ')}는 대체로 원활해요.` : '';
-    return `이날은 크게 붐비지 않을 것으로 보여요. 가장 차가 많은 시간은 <b>${HOURS[peak]}시</b> 무렵이에요. ${q}`;
-  }
-  const arrive = HOURS[firstBusy] - 1; // FAQ: 공연 임박 시 1시간 여유 권장
+  const runsOf = (k) => { const rs = []; HOURS.forEach((h, i) => { if (lv[i] !== k) return; const r = rs[rs.length - 1]; if (r && r[1] === h - 1) r[1] = h; else rs.push([h, h]); }); return rs; };
+  const fmt = (rs) => rs.map(([a, b]) => (a === b ? `${a}시` : `${a}~${b}시`)).join(', ');
+  const busy = runsOf(2), calm = runsOf(0);
   const d = new Date($('date').value + 'T00:00:00');
-  const morning = d.getDay() > 0 && d.getDay() < 6 && !$('event').checked && HOURS[peak] <= 11
-    ? ' 평일 오전 붐빔은 공연이 없는 날에도 나타나요(2025년 공연 없는 평일 10시 평균 2,036대).' : '';
-  return `<b>${HOURS[firstBusy]}시부터 혼잡</b>, 가장 붐비는 때는 <b>${HOURS[peak]}시</b>예요. 차를 가져오신다면 <b>${arrive}시 이전 도착</b>을 권해요. 가능하면 지하철(5·9호선 올림픽공원역, 8호선 몽촌토성역)을 이용하세요.${morning}`;
+  const dt = d.getDay() === 0 || d.getDay() === 6 ? 'weekend' : 'weekday';
+  const eve = (k) => [18, 19, 20].reduce((s, h) => s + M.curves[`${dt}_${k}`][h], 0);
+  const big = $('event').checked
+    ? ` 대형 공연일 18~20시 주차 차량은 대형 공연이 없는 ${dt === 'weekend' ? '주말' : '평일'}의 약 ${(eve(1) / eve(0)).toFixed(1)}배예요(2025 평균). 저녁 공연이라면 일찍 도착하거나 지하철을 이용하세요.` : '';
+  if (!busy.length) {
+    const q = calm.length ? `${fmt(calm)}는 대체로 원활해요.` : '';
+    return `이날은 크게 붐비지 않을 것으로 보여요. 가장 차가 많은 시간은 <b>${HOURS[peak]}시</b> 무렵이에요. ${q}${big}`;
+  }
+  const arrive = busy[0][0] - 1; // FAQ: 공연 임박 시 1시간 여유 권장
+  const morning = dt === 'weekday' && !$('event').checked && busy[0][0] <= 11
+    ? ` 평일 오전 붐빔은 대형 공연이 없는 날에도 나타나요(2025년 대형 공연 없는 평일 10시 평균 ${Math.round(M.curves.weekday_0[10]).toLocaleString()}대).` : '';
+  return `<b>${fmt(busy)} 혼잡</b>, 가장 붐비는 때는 <b>${HOURS[peak]}시</b>예요. 차를 가져오신다면 <b>${arrive}시 이전 도착</b>을 권해요. 가능하면 지하철(5·9호선 올림픽공원역, 8호선 몽촌토성역)을 이용하세요.${morning}${big}`;
 }
 
 /* ---------- 안내 검색: 글자 2-gram BM25, 브라우저 안에서만 동작 ---------- */
