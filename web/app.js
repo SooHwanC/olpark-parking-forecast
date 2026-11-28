@@ -72,7 +72,10 @@ function summarize(vals) {
     return `이날은 크게 붐비지 않을 것으로 보여요. 가장 차가 많은 시간은 <b>${HOURS[peak]}시</b> 무렵이에요. ${q}`;
   }
   const arrive = HOURS[firstBusy] - 1; // FAQ: 공연 임박 시 1시간 여유 권장
-  return `<b>${HOURS[firstBusy]}시부터 혼잡</b>, 가장 붐비는 때는 <b>${HOURS[peak]}시</b>예요. 차를 가져오신다면 <b>${arrive}시 이전 도착</b>을 권해요. 가능하면 지하철(5·9호선 올림픽공원역, 8호선 몽촌토성역)을 이용하세요.`;
+  const d = new Date($('date').value + 'T00:00:00');
+  const morning = d.getDay() > 0 && d.getDay() < 6 && !$('event').checked && HOURS[peak] <= 11
+    ? ' 평일 오전 붐빔은 공연이 없는 날에도 나타나요(2025년 공연 없는 평일 10시 평균 2,036대).' : '';
+  return `<b>${HOURS[firstBusy]}시부터 혼잡</b>, 가장 붐비는 때는 <b>${HOURS[peak]}시</b>예요. 차를 가져오신다면 <b>${arrive}시 이전 도착</b>을 권해요. 가능하면 지하철(5·9호선 올림픽공원역, 8호선 몽촌토성역)을 이용하세요.${morning}`;
 }
 
 /* ---------- 안내 검색: 글자 2-gram BM25, 브라우저 안에서만 동작 ---------- */
