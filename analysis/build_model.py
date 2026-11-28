@@ -69,8 +69,13 @@ if __name__ == '__main__':
         val[name] = score(te, c, t)
     curves, thr = fit(h)
     n = h[h.hour == 0].groupby(['dt', 'big']).size()
+    day0 = h[h.hour == 0]
+    eve = h[h.hour.between(17, 20)].groupby(h.ts.dt.date).agg(aud=('audience', 'max'), mx=('occ', 'max'))
+    huge = eve[eve.aud >= 20000]  # 관람객 2만 명 넘는 날 저녁도 혼잡이었는지(앱 안내 문장)
     model = {'source': SRC, 'days': int(h.ts.dt.date.nunique()), 'months': sorted(int(m) for m in h.month.unique()),
              'big_audience': BIG, 'curve_days': {f'{a}_{b}': int(v) for (a, b), v in n.items()},
+             'weekend_days': int((day0.dt == 'weekend').sum()), 'weekend_big_days': int(((day0.dt == 'weekend') & (day0.big == 1)).sum()),
+             'huge_days': int(len(huge)), 'huge_busy_days': int((huge.mx >= thr['busy']).sum()),
              'unit': 'cars', 'curves': curves, 'thresholds': thr,
              'validation': {'train': '2025-01~07', 'test': '2025-10~12', **val}}
     (OUT / 'model.json').write_text(json.dumps(model, ensure_ascii=False), encoding='utf-8')
